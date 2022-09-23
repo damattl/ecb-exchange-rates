@@ -8,6 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"log"
 	"net/http"
+	"time"
 )
 
 func startWebSever(appCtx context.Context) {
@@ -44,19 +45,76 @@ func getRateForCurrency(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rate, ok := findRateForCurrency(currency, date, client)
-	if !ok {
+	rate, err := findRateForCurrency(currency, date, client)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			handleDateNotFoundError(w, r)
+			return
+		}
+		if err == CurrencyError {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(err.Error()))
+		}
+
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
 
-	response, err := json.Marshal(ExchangeRate{currency, rate, date})
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(ExchangeRate{currency, rate, date})
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func handleDateNotFoundError(w http.ResponseWriter, r *http.Request) {
+	urlVars := mux.Vars(r)
+	currency := urlVars["currency"]
+	date := urlVars["date"]
+
+	parsedDate, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("date format not supported"))
+		// TODO: Use error structs with more detail
+		return
+	}
+
+	today := time.Now()
+	isFuture := today.Before(parsedDate)
+
+	if isFuture {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("date is in the future"))
+		return
+	}
+	err = refreshTodaysRates(r.Context())
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	client, ok := r.Context().Value(MONGO_DB_CLIENT).(*mongo.Client)
+	if !ok {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Println("database client not found") // TODO: HANDLE HANDLE HANDLE
+		return
+	}
+	rate, err := findRateForCurrency(currency, date, client)
+
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("could not get rate for this currency and date"))
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(response)
+	err = json.NewEncoder(w).Encode(ExchangeRate{currency, rate, date})
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }

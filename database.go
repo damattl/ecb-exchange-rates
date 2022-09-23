@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"log"
 	"time"
 )
 
@@ -45,19 +45,19 @@ func saveExchangeRatesToDB(exchangeRates *ExchangeRatesForDate, client *mongo.Cl
 	}
 }
 
-func findRateForCurrency(currency string, date string, client *mongo.Client) (string, bool) {
+func findRateForCurrency(currency string, date string, client *mongo.Client) (string, error) {
 	collection := client.Database(DB_ECB_RATES).Collection(COL_EX_RATES)
 
 	var rates ExchangeRatesForDate
 	err := collection.FindOne(context.TODO(), bson.D{{"date", date}}).Decode(&rates)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			// TODO: ERROR 404 NOT FOUND
-			return "", false
-		}
-		log.Printf("Collection error: %v\n", err)
-		return "", false
+		return "", err
 	}
 	rate, ok := rates.ExchangeRates[currency]
-	return rate, ok
+	if !ok {
+		return "", CurrencyError
+	}
+	return rate, nil
 }
+
+var CurrencyError = errors.New("currency not found")
