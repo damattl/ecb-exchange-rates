@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"time"
 )
 
 func getXML(url string) ([]byte, error) {
@@ -42,7 +43,11 @@ func getTodaysRates() *ExchangeRatesForDate {
 			fmt.Printf("Rate for currency %s is %s today \n", exRate.Currency, exRate.Rate)
 			todaysRate.ExchangeRates[exRate.Currency] = exRate.Rate
 		}
-		todaysRate.Date = result.ExchangeRates.ExchangeRatesForTime.Time
+		date, err := time.Parse("2006-01-02", result.ExchangeRates.ExchangeRatesForTime.Time)
+		if err != nil {
+			log.Fatalf("Could not parse date: %v", err)
+		}
+		todaysRate.Date = date.Unix()
 		return &todaysRate
 	}
 	return nil

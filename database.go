@@ -45,7 +45,7 @@ func saveExchangeRatesToDB(exchangeRates *ExchangeRatesForDate, client *mongo.Cl
 	}
 }
 
-func findRateForCurrency(currency string, date string, client *mongo.Client) (string, error) {
+func findRateForCurrency(currency string, date int64, client *mongo.Client) (string, error) {
 	collection := client.Database(DB_ECB_RATES).Collection(COL_EX_RATES)
 
 	var rates ExchangeRatesForDate
