@@ -2,28 +2,61 @@ package main
 
 import (
 	"context"
-	"go.mongodb.org/mongo-driver/bson"
+	"encoding/json"
+	"fmt"
+	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/mongo"
 	"log"
+	"net/http"
 )
 
-func getRateForCurrency(date string, currency string, appCtx context.Context) string {
-	client := getDatabaseClient(appCtx)
-	collection := client.Database(DB_ECB_RATES).Collection(COL_EX_RATES)
+func startWebSever(appCtx context.Context) {
+	r := mux.NewRouter()
+	r.Handle("/rate/{currency}/{date}", useAppContext(http.HandlerFunc(getRateForCurrency), appCtx))
+	http.Handle("/", r)
+	fmt.Println("Starting server...")
+	log.Fatal(http.ListenAndServe(":5555", nil))
+}
 
-	var rates ExchangeRatesForDate
-	err := collection.FindOne(context.TODO(), bson.D{{"date", date}}).Decode(&rates)
+func useAppContext(next http.Handler, appCtx context.Context) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r.WithContext(appCtx))
+	})
+}
+
+func getRateForCurrency(w http.ResponseWriter, r *http.Request) {
+	client, ok := r.Context().Value(MONGO_DB_CLIENT).(*mongo.Client)
+	if !ok {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Println("Database Client not found")
+		return
+	}
+
+	urlVars := mux.Vars(r)
+	currency, ok := urlVars["currency"]
+	if !ok {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	date, ok := urlVars["date"]
+	if !ok {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	rate, ok := findRateForCurrency(currency, date, client)
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	response, err := json.Marshal(ExchangeRate{currency, rate, date})
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			// TODO: ERROR 404 NOT FOUND
-			return ""
-		}
-		log.Printf("Collection error: %v\n", err)
-		return ""
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
-	rate, ok := rates.ExchangeRates[currency]
-	if ok {
-		return rate
-	}
-	return "" // TODO: NOT FOUND
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(response)
 }

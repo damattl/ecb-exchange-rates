@@ -12,12 +12,13 @@ func main() {
 	useDatabase(func(appCtx context.Context) {
 		todaysRates := getTodaysRates()
 		if todaysRates == nil {
-
 			// TODO: HANDLE ERROR
 		}
 		client := getDatabaseClient(appCtx)
 		saveExchangeRatesToDB(todaysRates, client)
 
-		println(getRateForCurrency("2022-09-21", "HKD", appCtx))
+		println(findRateForCurrency("2022-09-21", "HKD", client))
+
+		startWebSever(appCtx)
 	}, appCtx)
 }
