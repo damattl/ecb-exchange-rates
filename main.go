@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
+	"github.com/go-co-op/gocron"
 	"time"
 )
 
@@ -12,7 +14,24 @@ func main() {
 	appCtx := context.Background()
 
 	useDatabase(func(appCtx context.Context) {
-		refreshTodaysRates(appCtx) // TODO: Handle errors
+		err := refreshTodaysRates(appCtx)
+		if err != nil {
+			fmt.Printf("there was an error getting the most recent rates: %v\n", err)
+		}
+
+		location, err := time.LoadLocation("CET")
+		if err != nil {
+			panic(err)
+		}
+		scheduler := gocron.NewScheduler(location)
+		scheduler.Every(1).Day().At("16:00;18:00;20:00;23:59").Do(func() {
+			err = refreshTodaysRates(appCtx)
+			if err != nil {
+				fmt.Printf("there was an error getting the most recent rates: %v\n", err)
+			}
+		})
+
+		scheduler.StartAsync()
 
 		startWebSever(appCtx)
 	}, appCtx)
