@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"damattl.de/api/currency/src/ecb"
+	"damattl.de/api/currency/ecb"
 	"errors"
 	"fmt"
 	"github.com/go-co-op/gocron"
