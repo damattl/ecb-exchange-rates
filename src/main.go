@@ -2,13 +2,13 @@ package main
 
 import (
 	"context"
+	"damattl.de/api/currency/src/ecb"
 	"errors"
 	"fmt"
 	"github.com/go-co-op/gocron"
+	"log"
 	"time"
 )
-
-const ecbURL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
 
 func main() {
 	appCtx := context.Background()
@@ -37,6 +37,26 @@ func main() {
 	}, appCtx)
 }
 
+func getTodaysRates() *ExchangeRatesForDate {
+	ecbResults, err := ecb.GetTodaysRates()
+	if err != nil {
+		log.Print(err)
+		return nil
+	}
+	var todaysRate ExchangeRatesForDate
+	todaysRate.ExchangeRates = make(map[string]string)
+	for _, exRate := range ecbResults.ExchangeRates.ExchangeRatesForTime.ExchangeRateInfo {
+		fmt.Printf("Rate for currency %s is %s today \n", exRate.Currency, exRate.Rate)
+		todaysRate.ExchangeRates[exRate.Currency] = exRate.Rate
+	}
+	date, err := time.Parse("2006-01-02", ecbResults.ExchangeRates.ExchangeRatesForTime.Time)
+	if err != nil {
+		log.Fatalf("Could not parse date: %v", err)
+	}
+	todaysRate.Date = date.Unix()
+	return &todaysRate
+}
+
 func refreshTodaysRates(appCtx context.Context) error {
 	todaysRates := getTodaysRates()
 	if todaysRates == nil {
@@ -48,13 +68,13 @@ func refreshTodaysRates(appCtx context.Context) error {
 	client := getDatabaseClient(appCtx)
 	saveExchangeRatesToDB(todaysRates, client) // TODO: Handle error here?
 
-	// TODO: REMOVE LATER
+	/* // TODO: REMOVE LATER
 	today, _ := time.Parse("2006-01-02", "2022-09-22")
 	rate, err := findRateForCurrency("HKD", today.Unix(), client)
 	if err != nil {
 		println(err.Error())
 	}
-	println(rate)
+	println(rate) */
 
 	return nil
 }

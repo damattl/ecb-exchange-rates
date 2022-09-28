@@ -52,7 +52,7 @@ func getRateForCurrency(w http.ResponseWriter, r *http.Request, appCtx context.C
 	parsedDate, err := time.Parse("2006-01-02", date)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("date format not supported"))
+		writeError(APIError{"date format not supported", FORMAT_NOT_SUPPORTED_ERROR}, w)
 		// TODO: Use error structs with more detail
 		return
 	}
@@ -63,7 +63,7 @@ func getRateForCurrency(w http.ResponseWriter, r *http.Request, appCtx context.C
 
 	if isFuture {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("date is in the future"))
+		writeError(APIError{"date is in the future", FUTURE_DATE_ERROR}, w)
 		return
 	}
 
@@ -75,8 +75,8 @@ func getRateForCurrency(w http.ResponseWriter, r *http.Request, appCtx context.C
 		}
 		if err == CurrencyError {
 			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte(err.Error()))
-		}
+			writeError(APIError{err.Error(), CURRENCY_NOT_FOUND_ERROR}, w)
+		} // TODO: research MONGO-DB Errors
 
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -109,7 +109,7 @@ func handleDateNotFoundError(w http.ResponseWriter, appCtx context.Context, curr
 
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("could not get rate for this currency and unixDate"))
+		writeError(APIError{"could not get rate for this currency and unixDate", NO_ENTRY_FOUND_ERROR}, w)
 		return
 	}
 
@@ -120,4 +120,12 @@ func handleDateNotFoundError(w http.ResponseWriter, appCtx context.Context, curr
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func writeError(error APIError, w http.ResponseWriter) {
+	err := json.NewEncoder(w).Encode(error)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 }

@@ -7,9 +7,11 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"os"
 	"time"
 )
 
+const DEFAULT_MONGO_URL = "mongodb://localhost:27017"
 const MONGO_DB_CLIENT = "mongodb-client"
 const DB_ECB_RATES = "ecb-rates-db"
 const COL_EX_RATES = "exchange-rates"
@@ -18,10 +20,23 @@ func getDatabaseClient(appCtx context.Context) *mongo.Client {
 	return appCtx.Value(MONGO_DB_CLIENT).(*mongo.Client)
 }
 
+func getDatabaseURL() string {
+	url := os.Getenv("MONGO_URL")
+	fmt.Println(url)
+	if url == "" {
+		fmt.Println("USING DEFAULT URL")
+		return DEFAULT_MONGO_URL
+	}
+	return url
+}
+
 func useDatabase(child func(appCtx context.Context), appCtx context.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost:27017"))
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(getDatabaseURL()))
+	if err != nil {
+		panic("can't connect to database")
+	}
 
 	appCtx = context.WithValue(appCtx, MONGO_DB_CLIENT, client)
 
