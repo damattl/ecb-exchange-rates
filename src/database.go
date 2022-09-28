@@ -13,7 +13,7 @@ import (
 
 const DEFAULT_MONGO_URL = "mongodb://localhost:27017"
 const MONGO_DB_CLIENT = "mongodb-client"
-const DB_ECB_RATES = "ecb-rates-db"
+const DB_ECB_RATES = "linum_exchange_rates_db"
 const COL_EX_RATES = "exchange-rates"
 
 func getDatabaseClient(appCtx context.Context) *mongo.Client {
