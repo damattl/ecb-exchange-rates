@@ -76,3 +76,25 @@ func findRateForCurrency(currency string, date int64, client *mongo.Client) (str
 }
 
 var CurrencyError = errors.New("currency not found")
+
+func findAllSupportedCurrencies(date int64, client *mongo.Client) ([]string, error) {
+	collection := client.Database(DB_ECB_RATES).Collection(COL_EX_RATES)
+	var rates ExchangeRatesForDate
+	if date == -1 {
+		opts := options.FindOne().SetSort(bson.M{"$natural": -1})
+		err := collection.FindOne(context.TODO(), bson.M{}, opts).Decode(&rates)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		err := collection.FindOne(context.TODO(), bson.D{{"date", date}}).Decode(&rates)
+		if err != nil {
+			return nil, err
+		}
+	}
+	supportedCurrencies := make([]string, 0, len(rates.ExchangeRates))
+	for key := range rates.ExchangeRates {
+		supportedCurrencies = append(supportedCurrencies, key)
+	}
+	return supportedCurrencies, nil
+}

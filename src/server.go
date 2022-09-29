@@ -16,6 +16,8 @@ type handlerWithAppContext = func(http.ResponseWriter, *http.Request, context.Co
 func startWebSever(appCtx context.Context) {
 	r := mux.NewRouter()
 	r.HandleFunc("/rate/{currency}/{date}", useAppContext(getRateForCurrency, appCtx))
+	r.HandleFunc("/supported", useAppContext(getSupportedCurrencies, appCtx))
+	r.HandleFunc("/supported/{date}", useAppContext(getSupportedCurrencies, appCtx))
 	http.Handle("/", r)
 	fmt.Println("Starting server...")
 	log.Fatal(http.ListenAndServe(":5555", nil))
@@ -24,6 +26,55 @@ func startWebSever(appCtx context.Context) {
 func useAppContext(next handlerWithAppContext, appCtx context.Context) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		next(w, r, appCtx)
+	}
+}
+
+func getSupportedCurrencies(w http.ResponseWriter, r *http.Request, appCtx context.Context) {
+	client, ok := appCtx.Value(MONGO_DB_CLIENT).(*mongo.Client)
+	if !ok {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Println("Database Client not found")
+		return
+	}
+
+	unixDate := int64(-1)
+	urlVars := mux.Vars(r)
+	date, ok := urlVars["date"]
+	if ok {
+		parsedDate, err := time.Parse("2006-01-02", date)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			writeError(APIError{"date format not supported", FORMAT_NOT_SUPPORTED_ERROR}, w)
+			return
+		}
+		today := time.Now()
+		isFuture := today.Before(parsedDate)
+		if isFuture {
+			w.WriteHeader(http.StatusBadRequest)
+			writeError(APIError{"date is in the future", FUTURE_DATE_ERROR}, w)
+			return
+		}
+		unixDate = parsedDate.Unix()
+	}
+
+	supportedCurrencies, err := findAllSupportedCurrencies(unixDate, client)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			w.WriteHeader(http.StatusNotFound)
+			writeError(APIError{"could not find any information", NO_ENTRY_FOUND_ERROR}, w)
+			return
+		}
+		log.Println(err.Error())
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	err = json.NewEncoder(w).Encode(supportedCurrencies)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 }
 
