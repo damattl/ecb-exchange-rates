@@ -8,6 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -133,9 +134,16 @@ func getRateForCurrency(w http.ResponseWriter, r *http.Request, appCtx context.C
 		return
 	}
 
+	parsedRate, err := strconv.ParseFloat(rate, 64)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		writeError(APIError{"could not convert rate", CONVERSION_ERROR}, w)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	err = json.NewEncoder(w).Encode(ExchangeRate{currency, rate, unixDate})
+	err = json.NewEncoder(w).Encode(ExchangeRate{currency, parsedRate, unixDate})
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -157,15 +165,21 @@ func handleDateNotFoundError(w http.ResponseWriter, appCtx context.Context, curr
 		return
 	}
 	rate, err := findRateForCurrency(currency, unixDate, client)
-
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		writeError(APIError{"could not get rate for this currency and unixDate", NO_ENTRY_FOUND_ERROR}, w)
 		return
 	}
 
+	parsedRate, err := strconv.ParseFloat(rate, 64)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		writeError(APIError{"could not convert rate", CONVERSION_ERROR}, w)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	err = json.NewEncoder(w).Encode(ExchangeRate{currency, rate, unixDate})
+	err = json.NewEncoder(w).Encode(ExchangeRate{currency, parsedRate, unixDate})
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
