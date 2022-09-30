@@ -41,8 +41,9 @@ func handleDateNotFoundError(w http.ResponseWriter, appCtx context.Context, curr
 		return
 	}
 
+	date := time.Unix(unixDate, 0).Format("2006-01-02")
 	w.Header().Set("Content-Type", "application/json")
-	err = json.NewEncoder(w).Encode(models.ExchangeRate{Currency: currency, Rate: parsedRate, Date: unixDate})
+	err = json.NewEncoder(w).Encode(models.ExchangeRateDto{Currency: currency, Rate: parsedRate, Date: date})
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return

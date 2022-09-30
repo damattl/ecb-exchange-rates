@@ -88,9 +88,11 @@ func getRatesUntil(w http.ResponseWriter, r *http.Request, appCtx context.Contex
 		return
 	}
 
+	ratesUntilDto := models.ExchangeRatesForDateToDto(ratesUntil)
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	err = json.NewEncoder(w).Encode(ratesUntil)
+	err = json.NewEncoder(w).Encode(ratesUntilDto)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -128,12 +130,13 @@ func getRatesForCurrencyUntil(w http.ResponseWriter, r *http.Request, appCtx con
 		return
 	}
 
-	ratesForCurrencyUntil := make([]models.ExchangeRate, len(ratesUntil))
+	ratesForCurrencyUntil := make([]models.ExchangeRateDto, len(ratesUntil))
 	for _, entry := range ratesUntil {
 		rate, ok := entry.ExchangeRates[currency]
 		if ok {
 			if parsedRate, err := strconv.ParseFloat(rate, 64); err == nil {
-				ratesForCurrencyUntil = append(ratesForCurrencyUntil, models.ExchangeRate{Currency: currency, Rate: parsedRate, Date: entry.Date})
+				date := time.Unix(entry.Date, 0).Format("2006-01-02")
+				ratesForCurrencyUntil = append(ratesForCurrencyUntil, models.ExchangeRateDto{Currency: currency, Rate: parsedRate, Date: date})
 			}
 		}
 	}
@@ -196,9 +199,11 @@ func getRateForCurrency(w http.ResponseWriter, r *http.Request, appCtx context.C
 		return
 	}
 
+	date := time.Unix(unixDate, 0).Format("2006-01-02")
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	err = json.NewEncoder(w).Encode(models.ExchangeRate{Currency: currency, Rate: parsedRate, Date: unixDate})
+	err = json.NewEncoder(w).Encode(models.ExchangeRateDto{Currency: currency, Rate: parsedRate, Date: date})
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
