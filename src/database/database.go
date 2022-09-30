@@ -1,8 +1,8 @@
-package main
+package database
 
 import (
 	"context"
-	"errors"
+	"damattl.de/api/currency/models"
 	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -11,12 +11,14 @@ import (
 	"time"
 )
 
-const DEFAULT_MONGO_URL = "mongodb://localhost:27017"
-const MONGO_DB_CLIENT = "mongodb-client"
-const DB_ECB_RATES = "linum_exchange_rates_db"
-const COL_EX_RATES = "exchange-rates"
+const (
+	DEFAULT_MONGO_URL = "mongodb://localhost:27017"
+	MONGO_DB_CLIENT   = "mongodb-client"
+	DB_ECB_RATES      = "linum_exchange_rates_db"
+	COL_EX_RATES      = "exchange-rates"
+)
 
-func getDatabaseClient(appCtx context.Context) *mongo.Client {
+func GetClient(appCtx context.Context) *mongo.Client {
 	return appCtx.Value(MONGO_DB_CLIENT).(*mongo.Client)
 }
 
@@ -30,7 +32,7 @@ func getDatabaseURL() string {
 	return url
 }
 
-func useDatabase(child func(appCtx context.Context), appCtx context.Context) {
+func UseDatabase(child func(appCtx context.Context), appCtx context.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(getDatabaseURL()))
@@ -49,7 +51,7 @@ func useDatabase(child func(appCtx context.Context), appCtx context.Context) {
 	}()
 }
 
-func saveExchangeRatesToDB(exchangeRates *ExchangeRatesForDate, client *mongo.Client) {
+func SaveExchangeRates(exchangeRates *models.ExchangeRatesForDate, client *mongo.Client) {
 
 	println("Saving rates to db...")
 	collection := client.Database(DB_ECB_RATES).Collection(COL_EX_RATES)
@@ -60,10 +62,10 @@ func saveExchangeRatesToDB(exchangeRates *ExchangeRatesForDate, client *mongo.Cl
 	}
 }
 
-func findRateForCurrency(currency string, date int64, client *mongo.Client) (string, error) {
+func FindRateForCurrency(currency string, date int64, client *mongo.Client) (string, error) {
 	collection := client.Database(DB_ECB_RATES).Collection(COL_EX_RATES)
 
-	var rates ExchangeRatesForDate
+	var rates models.ExchangeRatesForDate
 	err := collection.FindOne(context.TODO(), bson.D{{"date", date}}).Decode(&rates)
 	if err != nil {
 		return "", err
@@ -75,11 +77,9 @@ func findRateForCurrency(currency string, date int64, client *mongo.Client) (str
 	return rate, nil
 }
 
-var CurrencyError = errors.New("currency not found")
-
-func findAllSupportedCurrencies(date int64, client *mongo.Client) ([]string, error) {
+func FindAllSupportedCurrencies(date int64, client *mongo.Client) ([]string, error) {
 	collection := client.Database(DB_ECB_RATES).Collection(COL_EX_RATES)
-	var rates ExchangeRatesForDate
+	var rates models.ExchangeRatesForDate
 	if date == -1 {
 		opts := options.FindOne().SetSort(bson.M{"$natural": -1})
 		err := collection.FindOne(context.TODO(), bson.M{}, opts).Decode(&rates)
@@ -97,4 +97,22 @@ func findAllSupportedCurrencies(date int64, client *mongo.Client) ([]string, err
 		supportedCurrencies = append(supportedCurrencies, key)
 	}
 	return supportedCurrencies, nil
+}
+
+func QueryAllExchangeRatesUntil(date int64, client *mongo.Client) ([]models.ExchangeRatesForDate, error) {
+	collection := client.Database(DB_ECB_RATES).Collection(COL_EX_RATES)
+	var ratesUntil []models.ExchangeRatesForDate
+	filter := bson.M{
+		"date": bson.M{
+			"$lte": date,
+		},
+	}
+	cursor, err := collection.Find(context.TODO(), filter)
+	if err != nil {
+		return nil, err
+	}
+	if err = cursor.All(context.TODO(), &ratesUntil); err != nil {
+		return nil, err
+	}
+	return ratesUntil, nil
 }
