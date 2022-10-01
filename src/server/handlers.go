@@ -40,7 +40,7 @@ func getSupportedCurrencies(w http.ResponseWriter, r *http.Request, appCtx conte
 			return
 		}
 		unixDate = parsedDate.Unix()
-	}
+	} // TODO: Check if its possible to use the new handler
 
 	supportedCurrencies, err := database.FindAllSupportedCurrencies(unixDate, client)
 	if err != nil {
@@ -63,6 +63,43 @@ func getSupportedCurrencies(w http.ResponseWriter, r *http.Request, appCtx conte
 	}
 }
 
+func getRatesForDate(w http.ResponseWriter, r *http.Request, appCtx context.Context) {
+	client, ok := appCtx.Value(database.MONGO_DB_CLIENT).(*mongo.Client)
+	if !ok {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Println("Database Client not found")
+		return
+	}
+
+	urlVars := mux.Vars(r)
+	unixDate, isFuture, err := parseDateAndHandleError(w, r, urlVars, "date")
+	if err != nil {
+		return
+	}
+
+	if isFuture {
+		w.WriteHeader(http.StatusBadRequest)
+		writeError(models.APIError{Message: "date is in the future", Code: models.FUTURE_DATE_ERROR}, w)
+		return
+	}
+
+	rates, err := database.FindExchangeRatesForDate(unixDate, client)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	ratesDto := models.ExchangeRatesForDateToDto(rates)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	err = json.NewEncoder(w).Encode(ratesDto)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+}
+
 func getRatesUntil(w http.ResponseWriter, r *http.Request, appCtx context.Context) {
 	client, ok := appCtx.Value(database.MONGO_DB_CLIENT).(*mongo.Client)
 	if !ok {
@@ -73,14 +110,14 @@ func getRatesUntil(w http.ResponseWriter, r *http.Request, appCtx context.Contex
 
 	urlVars := mux.Vars(r)
 
-	unixDate, isFuture, err := parseDateAndHandleError(w, r, urlVars)
+	unixDate, isFuture, err := parseDateAndHandleError(w, r, urlVars, "date")
 	if err != nil {
 		return
 	}
 
 	if isFuture {
 		unixDate = time.Now().Unix()
-	}
+	} // TODO: Might not even be needed
 
 	ratesUntil, err := database.QueryAllExchangeRatesUntil(unixDate, client)
 	if err != nil {
@@ -88,7 +125,7 @@ func getRatesUntil(w http.ResponseWriter, r *http.Request, appCtx context.Contex
 		return
 	}
 
-	ratesUntilDto := models.ExchangeRatesForDateToDto(ratesUntil)
+	ratesUntilDto := models.ExchangeRatesForDateListToDto(ratesUntil)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -115,7 +152,7 @@ func getRatesForCurrencyUntil(w http.ResponseWriter, r *http.Request, appCtx con
 		return
 	}
 
-	unixDate, isFuture, err := parseDateAndHandleError(w, r, urlVars)
+	unixDate, isFuture, err := parseDateAndHandleError(w, r, urlVars, "date")
 	if err != nil {
 		return
 	}
@@ -150,6 +187,45 @@ func getRatesForCurrencyUntil(w http.ResponseWriter, r *http.Request, appCtx con
 	}
 }
 
+func getRatesForTimeSpan(w http.ResponseWriter, r *http.Request, appCtx context.Context) {
+	client, ok := appCtx.Value(database.MONGO_DB_CLIENT).(*mongo.Client)
+	if !ok {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Println("Database Client not found")
+		return
+	}
+
+	urlVars := mux.Vars(r)
+	earliestDateUnix, earliestIsFuture, err := parseDateAndHandleError(w, r, urlVars, "latestDate")
+	latestDateUnix, _, err := parseDateAndHandleError(w, r, urlVars, "earliestDate")
+	if err != nil {
+		return
+	}
+
+	if earliestIsFuture {
+		w.WriteHeader(http.StatusBadRequest)
+		writeError(models.APIError{Message: "earliest date is in the future", Code: models.FUTURE_DATE_ERROR}, w)
+		return
+	}
+
+	ratesForTimeSpan, err := database.QueryAllExchangeRatesForTimeSpan(earliestDateUnix, latestDateUnix, client)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	ratesUntilDto := models.ExchangeRatesForDateListToDto(ratesForTimeSpan)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	err = json.NewEncoder(w).Encode(ratesUntilDto)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+}
+
 func getRateForCurrency(w http.ResponseWriter, r *http.Request, appCtx context.Context) {
 	client, ok := appCtx.Value(database.MONGO_DB_CLIENT).(*mongo.Client)
 	if !ok {
@@ -166,7 +242,7 @@ func getRateForCurrency(w http.ResponseWriter, r *http.Request, appCtx context.C
 		return
 	}
 
-	unixDate, isFuture, err := parseDateAndHandleError(w, r, urlVars)
+	unixDate, isFuture, err := parseDateAndHandleError(w, r, urlVars, "date")
 	if err != nil {
 		return
 	}

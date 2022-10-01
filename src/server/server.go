@@ -13,8 +13,10 @@ type handlerWithAppContext = func(http.ResponseWriter, *http.Request, context.Co
 func StartWebSever(appCtx context.Context) {
 	r := mux.NewRouter()
 	r.HandleFunc("/rate/{date}/{currency}", useAppContext(getRateForCurrency, appCtx))
+	r.HandleFunc("/rates/{date}", useAppContext(getRatesForDate, appCtx))
 	r.HandleFunc("/rates-until/{date}", useAppContext(getRatesUntil, appCtx))
 	r.HandleFunc("/rates-until/{date}/{currency}", useAppContext(getRatesForCurrencyUntil, appCtx))
+	r.HandleFunc("/rates-between/{earliestDate}/{latestDate}", useAppContext(getRatesForTimeSpan, appCtx))
 	r.HandleFunc("/supported", useAppContext(getSupportedCurrencies, appCtx))
 	r.HandleFunc("/supported/{date}", useAppContext(getSupportedCurrencies, appCtx))
 	http.Handle("/", r)

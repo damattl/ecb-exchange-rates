@@ -77,6 +77,13 @@ func FindRateForCurrency(currency string, date int64, client *mongo.Client) (str
 	return rate, nil
 }
 
+func FindExchangeRatesForDate(date int64, client *mongo.Client) (*models.ExchangeRatesForDate, error) {
+	collection := client.Database(DB_ECB_RATES).Collection(COL_EX_RATES)
+	var rates models.ExchangeRatesForDate
+	err := collection.FindOne(context.TODO(), bson.D{{"date", date}}).Decode(&rates)
+	return &rates, err
+}
+
 func FindAllSupportedCurrencies(date int64, client *mongo.Client) ([]string, error) {
 	collection := client.Database(DB_ECB_RATES).Collection(COL_EX_RATES)
 	var rates models.ExchangeRatesForDate
@@ -105,6 +112,25 @@ func QueryAllExchangeRatesUntil(date int64, client *mongo.Client) ([]models.Exch
 	filter := bson.M{
 		"date": bson.M{
 			"$lte": date,
+		},
+	}
+	cursor, err := collection.Find(context.TODO(), filter)
+	if err != nil {
+		return nil, err
+	}
+	if err = cursor.All(context.TODO(), &ratesUntil); err != nil {
+		return nil, err
+	}
+	return ratesUntil, nil
+}
+
+func QueryAllExchangeRatesForTimeSpan(earliestDate int64, latestDate int64, client *mongo.Client) ([]models.ExchangeRatesForDate, error) {
+	collection := client.Database(DB_ECB_RATES).Collection(COL_EX_RATES)
+	var ratesUntil []models.ExchangeRatesForDate
+	filter := bson.M{
+		"date": bson.M{
+			"$lte": latestDate,
+			"$gte": earliestDate,
 		},
 	}
 	cursor, err := collection.Find(context.TODO(), filter)

@@ -59,8 +59,8 @@ func writeError(error models.APIError, w http.ResponseWriter) {
 	}
 }
 
-func parseDateAndHandleError(w http.ResponseWriter, r *http.Request, urlVars map[string]string) (int64, bool, error) {
-	date, ok := urlVars["date"]
+func parseDateAndHandleError(w http.ResponseWriter, r *http.Request, urlVars map[string]string, dateKey string) (int64, bool, error) {
+	date, ok := urlVars[dateKey]
 	if !ok {
 		w.WriteHeader(http.StatusBadRequest)
 		return 0, false, errors.New("route-information missing: date")
