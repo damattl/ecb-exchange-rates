@@ -127,10 +127,13 @@ func QueryAllExchangeRatesUntil(date int64, client *mongo.Client) ([]models.Exch
 func QueryAllExchangeRatesForTimeSpan(earliestDate int64, latestDate int64, client *mongo.Client) ([]models.ExchangeRatesForDate, error) {
 	collection := client.Database(DB_ECB_RATES).Collection(COL_EX_RATES)
 	var ratesUntil []models.ExchangeRatesForDate
-	filter := bson.M{
-		"date": bson.M{
-			"$lte": latestDate,
-			"$gte": earliestDate,
+	filter := bson.D{
+		{
+			"$and",
+			bson.A{
+				bson.D{{"date", bson.D{{"$lte", latestDate}}}},
+				bson.D{{"date", bson.D{{"$gte", earliestDate}}}},
+			},
 		},
 	}
 	cursor, err := collection.Find(context.TODO(), filter)

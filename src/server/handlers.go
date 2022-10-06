@@ -195,8 +195,8 @@ func getRatesForTimeSpan(w http.ResponseWriter, r *http.Request, appCtx context.
 	}
 
 	urlVars := mux.Vars(r)
-	earliestDateUnix, earliestIsFuture, err := parseDateAndHandleError(w, r, urlVars, "latestDate")
-	latestDateUnix, _, err := parseDateAndHandleError(w, r, urlVars, "earliestDate")
+	earliestDateUnix, earliestIsFuture, err := parseDateAndHandleError(w, r, urlVars, "earliestDate")
+	latestDateUnix, _, err := parseDateAndHandleError(w, r, urlVars, "latestDate")
 	if err != nil {
 		return
 	}
@@ -209,6 +209,7 @@ func getRatesForTimeSpan(w http.ResponseWriter, r *http.Request, appCtx context.
 
 	ratesForTimeSpan, err := database.QueryAllExchangeRatesForTimeSpan(earliestDateUnix, latestDateUnix, client)
 	if err != nil {
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
