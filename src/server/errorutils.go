@@ -11,6 +11,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -79,4 +80,14 @@ func parseDateAndHandleError(w http.ResponseWriter, r *http.Request, urlVars map
 	isFuture := today.Before(parsedDate)
 
 	return unixDate, isFuture, nil
+}
+
+func parseCurrencyAndHandleError(w http.ResponseWriter, r *http.Request, urlVars map[string]string) (string, error) {
+	currency, ok := urlVars["currency"]
+	if !ok {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Println("route-information missing: currency")
+		return "", nil
+	}
+	return strings.ToUpper(currency), nil
 }

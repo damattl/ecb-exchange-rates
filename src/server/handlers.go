@@ -29,14 +29,14 @@ func getSupportedCurrencies(w http.ResponseWriter, r *http.Request, appCtx conte
 		parsedDate, err := time.Parse("2006-01-02", date)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			writeError(models.APIError{"date format not supported", models.FORMAT_NOT_SUPPORTED_ERROR}, w)
+			writeError(models.APIError{Message: "date format not supported", Code: models.FORMAT_NOT_SUPPORTED_ERROR}, w)
 			return
 		}
 		today := time.Now()
 		isFuture := today.Before(parsedDate)
 		if isFuture {
 			w.WriteHeader(http.StatusBadRequest)
-			writeError(models.APIError{"date is in the future", models.FUTURE_DATE_ERROR}, w)
+			writeError(models.APIError{Message: "date is in the future", Code: models.FUTURE_DATE_ERROR}, w)
 			return
 		}
 		unixDate = parsedDate.Unix()
@@ -46,7 +46,7 @@ func getSupportedCurrencies(w http.ResponseWriter, r *http.Request, appCtx conte
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			w.WriteHeader(http.StatusNotFound)
-			writeError(models.APIError{"could not find any information", models.NO_ENTRY_FOUND_ERROR}, w)
+			writeError(models.APIError{Message: "could not find any information", Code: models.NO_ENTRY_FOUND_ERROR}, w)
 			return
 		}
 		log.Println(err.Error())
@@ -145,10 +145,9 @@ func getRatesForCurrencyUntil(w http.ResponseWriter, r *http.Request, appCtx con
 	}
 
 	urlVars := mux.Vars(r)
-	currency, ok := urlVars["currency"]
-	if !ok {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Println("route-information missing: currency")
+
+	currency, err := parseCurrencyAndHandleError(w, r, urlVars)
+	if err != nil {
 		return
 	}
 
@@ -235,12 +234,12 @@ func getRateForCurrency(w http.ResponseWriter, r *http.Request, appCtx context.C
 	}
 
 	urlVars := mux.Vars(r)
-	currency, ok := urlVars["currency"]
-	if !ok {
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Println("route-information missing: currency")
+
+	currency, err := parseCurrencyAndHandleError(w, r, urlVars)
+	if err != nil {
 		return
 	}
+	println(currency)
 
 	unixDate, isFuture, err := parseDateAndHandleError(w, r, urlVars, "date")
 	if err != nil {
