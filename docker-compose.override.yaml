@@ -1,0 +1,17 @@
+services:
+  app:
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${TRAEFIK_NETWORK:-traefik-proxy}
+      - traefik.http.routers.ecb-exchange-rates.rule=Host(`${DOMAIN:-exchange-rates.investit-academy.de}`)
+      - traefik.http.routers.ecb-exchange-rates.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}
+      - traefik.http.routers.ecb-exchange-rates.tls=true
+      - traefik.http.routers.ecb-exchange-rates.tls.certresolver=${TRAEFIK_CERTRESOLVER:-le-http}
+      - traefik.http.services.ecb-exchange-rates.loadbalancer.server.port=5555
+    networks:
+      - traefik
+
+networks:
+  traefik:
+    name: ${TRAEFIK_NETWORK:-traefik-proxy}
+    external: true
