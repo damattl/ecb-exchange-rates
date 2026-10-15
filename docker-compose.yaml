@@ -19,6 +19,7 @@ services:
 
 volumes:
   mongo-data:
+    name: ecb-exchange-ranges.mongo-data.prod
 
 networks:
   internal:
