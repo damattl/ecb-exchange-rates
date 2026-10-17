@@ -14,7 +14,7 @@ import (
 const (
 	DEFAULT_MONGO_URL = "mongodb://localhost:27017"
 	MONGO_DB_CLIENT   = "mongodb-client"
-	DB_ECB_RATES      = "linum_exchange_rates_db"
+	DEFAULT_MONGO_DB  = "linum_exchange_rates_db"
 	COL_EX_RATES      = "exchange-rates"
 )
 
@@ -24,12 +24,19 @@ func GetClient(appCtx context.Context) *mongo.Client {
 
 func getDatabaseURL() string {
 	url := os.Getenv("MONGO_URL")
-	fmt.Println(url)
 	if url == "" {
 		fmt.Println("USING DEFAULT URL")
 		return DEFAULT_MONGO_URL
 	}
 	return url
+}
+
+func getDatabaseName() string {
+	name := os.Getenv("MONGO_DB")
+	if name == "" {
+		return DEFAULT_MONGO_DB
+	}
+	return name
 }
 
 func UseDatabase(child func(appCtx context.Context), appCtx context.Context) {
@@ -54,7 +61,7 @@ func UseDatabase(child func(appCtx context.Context), appCtx context.Context) {
 func SaveExchangeRates(exchangeRates *models.ExchangeRatesForDate, client *mongo.Client) {
 
 	println("Saving rates to db...")
-	collection := client.Database(DB_ECB_RATES).Collection(COL_EX_RATES)
+	collection := client.Database(getDatabaseName()).Collection(COL_EX_RATES)
 
 	_, err := collection.InsertOne(context.TODO(), exchangeRates)
 	if err != nil {
@@ -63,7 +70,7 @@ func SaveExchangeRates(exchangeRates *models.ExchangeRatesForDate, client *mongo
 }
 
 func FindRateForCurrency(currency string, date int64, client *mongo.Client) (string, error) {
-	collection := client.Database(DB_ECB_RATES).Collection(COL_EX_RATES)
+	collection := client.Database(getDatabaseName()).Collection(COL_EX_RATES)
 
 	var rates models.ExchangeRatesForDate
 	err := collection.FindOne(context.TODO(), bson.D{{"date", date}}).Decode(&rates)
@@ -78,14 +85,14 @@ func FindRateForCurrency(currency string, date int64, client *mongo.Client) (str
 }
 
 func FindExchangeRatesForDate(date int64, client *mongo.Client) (*models.ExchangeRatesForDate, error) {
-	collection := client.Database(DB_ECB_RATES).Collection(COL_EX_RATES)
+	collection := client.Database(getDatabaseName()).Collection(COL_EX_RATES)
 	var rates models.ExchangeRatesForDate
 	err := collection.FindOne(context.TODO(), bson.D{{"date", date}}).Decode(&rates)
 	return &rates, err
 }
 
 func FindAllSupportedCurrencies(date int64, client *mongo.Client) ([]string, error) {
-	collection := client.Database(DB_ECB_RATES).Collection(COL_EX_RATES)
+	collection := client.Database(getDatabaseName()).Collection(COL_EX_RATES)
 	var rates models.ExchangeRatesForDate
 	if date == -1 {
 		opts := options.FindOne().SetSort(bson.M{"$natural": -1})
@@ -107,7 +114,7 @@ func FindAllSupportedCurrencies(date int64, client *mongo.Client) ([]string, err
 }
 
 func QueryAllExchangeRatesUntil(date int64, client *mongo.Client) ([]models.ExchangeRatesForDate, error) {
-	collection := client.Database(DB_ECB_RATES).Collection(COL_EX_RATES)
+	collection := client.Database(getDatabaseName()).Collection(COL_EX_RATES)
 	var ratesUntil []models.ExchangeRatesForDate
 	filter := bson.M{
 		"date": bson.M{
@@ -125,7 +132,7 @@ func QueryAllExchangeRatesUntil(date int64, client *mongo.Client) ([]models.Exch
 }
 
 func QueryAllExchangeRatesForTimeSpan(earliestDate int64, latestDate int64, client *mongo.Client) ([]models.ExchangeRatesForDate, error) {
-	collection := client.Database(DB_ECB_RATES).Collection(COL_EX_RATES)
+	collection := client.Database(getDatabaseName()).Collection(COL_EX_RATES)
 	var ratesUntil []models.ExchangeRatesForDate
 	filter := bson.D{
 		{
